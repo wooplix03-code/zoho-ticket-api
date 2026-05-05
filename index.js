@@ -97,6 +97,53 @@ app.post("/api/create-ticket", async (req, res) => {
   }
 });
 
+app.get("/api/get-ticket/:id", async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    // token generate
+    const tokenRes = await axios.post(
+      "https://accounts.zoho.in/oauth/v2/token",
+      null,
+      {
+        params: {
+          refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+          client_id: process.env.ZOHO_CLIENT_ID,
+          client_secret: process.env.ZOHO_CLIENT_SECRET,
+          grant_type: "refresh_token"
+        }
+      }
+    );
+
+    const token = tokenRes.data.access_token;
+
+    // get ticket
+    const ticket = await axios.get(
+      `https://desk.zoho.in/api/v1/tickets/${ticketId}`,
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${token}`,
+          orgId: process.env.ZOHO_ORG_ID
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      data: ticket.data
+    });
+
+  } catch (err) {
+    console.log(err.response?.data || err.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch ticket"
+    });
+  }
+});
+
+
+
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
 });
