@@ -228,6 +228,133 @@ app.get("/api/get-ticket/:id", async (req, res) => {
   }
 });
 
+// ✏️ UPDATE TICKET (with file)
+app.patch("/api/update-ticket/:id", upload.single("file"), async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    const {
+      subject,
+      description,
+      status,
+      priority,
+
+      wallet_address,
+      wallet_provider,
+      discord_username,
+      browser,
+      device,
+      input_token_mint,
+      output_token_mint,
+      transaction_signature,
+      actual_result,
+      expected_result,
+      network,
+      request_type,
+      issue_category
+    } = req.body;
+
+    console.log("UPDATE BODY:", req.body);
+
+    // 🔐 TOKEN
+    const tokenRes = await retry(() =>
+      axios.post("https://accounts.zoho.in/oauth/v2/token", null, {
+        params: {
+          refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+          client_id: process.env.ZOHO_CLIENT_ID,
+          client_secret: process.env.ZOHO_CLIENT_SECRET,
+          grant_type: "refresh_token"
+        }
+      })
+    );
+
+    const token = tokenRes.data.access_token;
+
+    // 🧠 CUSTOM FIELDS
+    const cf = {
+      cf_wallet_address: wallet_address,
+      cf_wallet_provider: wallet_provider,
+      cf_discord_x_username: discord_username,
+      cf_browser: browser,
+      cf_device: device,
+      cf_input_token_mint: input_token_mint,
+      cf_output_token_mint: output_token_mint,
+      cf_transaction_signature: transaction_signature,
+      cf_actual_result: actual_result,
+      cf_expected_result: expected_result,
+      cf_request_type: request_type,
+      cf_issue_category: issue_category,
+      cf_network: network
+    };
+
+    // remove empty
+    Object.keys(cf).forEach((key) => {
+      if (!cf[key]) delete cf[key];
+    });
+
+    // ✏️ UPDATE TICKET
+    const response = await axios.patch(
+      `https://desk.zoho.in/api/v1/tickets/${ticketId}`,
+      {
+        subject,
+        description,
+        status,
+        priority,
+        cf: cf
+      },
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${token}`,
+          orgId: process.env.ZOHO_ORG_ID
+        }
+      }
+    );
+
+    // 📎 FILE ATTACHMENT (if provided)
+    if (req.file) {
+      try {
+        const formData = new FormData();
+
+        formData.append("file", fs.createReadStream(req.file.path), {
+          filename: req.file.originalname,
+          contentType: req.file.mimetype
+        });
+
+        await axios.post(
+          `https://desk.zoho.in/api/v1/tickets/${ticketId}/attachments`,
+          formData,
+          {
+            headers: {
+              Authorization: `Zoho-oauthtoken ${token}`,
+              orgId: process.env.ZOHO_ORG_ID,
+              ...formData.getHeaders()
+            }
+          }
+        );
+
+        fs.unlinkSync(req.file.path);
+        console.log("Update attachment uploaded ✅");
+
+      } catch (err) {
+        console.log("Update Attachment Error:", err.response?.data || err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: response.data
+    });
+
+  } catch (err) {
+    console.log("UPDATE ERROR:", err.response?.data || err.message);
+
+    res.status(500).json({
+      success: false,
+      error: err.response?.data || "Failed to update ticket"
+    });
+  }
+});
+
 // 🚀 START
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
