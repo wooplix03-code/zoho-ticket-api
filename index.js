@@ -7,16 +7,17 @@ const cors = require("cors");
 const FormData = require("form-data");
 
 const app = express();
-app.use(express.json({ limit: "10mb" })); // base64 ke liye limit badhai
+app.use(express.json({ limit: "10mb" }));
 app.use(cors());
 
+// ✅ Health check
 app.get("/", (req, res) => {
   res.send("Zoho Ticket API is running 🚀");
 });
 
 const PORT = process.env.PORT || 3000;
 
-// 🔁 retry helper
+// 🔁 Retry helper
 async function retry(fn, retries = 3) {
   try {
     return await fn();
@@ -26,7 +27,7 @@ async function retry(fn, retries = 3) {
   }
 }
 
-// 🎫 CREATE TICKET API
+// 🎫 CREATE TICKET
 app.post("/api/create-ticket", async (req, res) => {
   try {
     const {
@@ -50,7 +51,10 @@ app.post("/api/create-ticket", async (req, res) => {
       file_data
     } = req.body;
 
-    // ✅ validation
+    // ✅ DEBUG LOG
+    console.log("REQ BODY:", req.body);
+
+    // ✅ Validation
     if (!subject || !description || !email) {
       return res.status(400).json({
         success: false,
@@ -58,7 +62,7 @@ app.post("/api/create-ticket", async (req, res) => {
       });
     }
 
-    // 🔐 GET TOKEN
+    // 🔐 TOKEN
     const tokenRes = await retry(() =>
       axios.post("https://accounts.zoho.in/oauth/v2/token", null, {
         params: {
@@ -72,7 +76,7 @@ app.post("/api/create-ticket", async (req, res) => {
 
     const token = tokenRes.data.access_token;
 
-    // 👤 CREATE CONTACT
+    // 👤 CONTACT CREATE
     const contact = await axios.post(
       "https://desk.zoho.in/api/v1/contacts",
       {
@@ -87,6 +91,29 @@ app.post("/api/create-ticket", async (req, res) => {
       }
     );
 
+    // 🧠 CLEAN CUSTOM FIELDS
+    const customFields = {
+      cf_wallet_address: wallet_address,
+      cf_wallet_provider: wallet_provider,
+      cf_discord_x_username: discord_username,
+      cf_browser: browser,
+      cf_device: device,
+      cf_output_token_mint: output_token_mint,
+      cf_transaction_signature: transaction_signature,
+      cf_actual_result: actual_result,
+      cf_expected_result: expected_result,
+      cf_network: network
+    };
+
+    // ❗ remove empty fields
+    Object.keys(customFields).forEach((key) => {
+      if (customFields[key] === undefined || customFields[key] === null || customFields[key] === "") {
+        delete customFields[key];
+      }
+    });
+
+    console.log("FINAL CUSTOM FIELDS:", customFields);
+
     // 🎫 CREATE TICKET
     const ticket = await axios.post(
       "https://desk.zoho.in/api/v1/tickets",
@@ -98,19 +125,7 @@ app.post("/api/create-ticket", async (req, res) => {
         priority: "High",
         status: "Open",
         channel: "Web",
-
-        customFields: {
-          cf_wallet_address: wallet_address,
-          cf_wallet_provider: wallet_provider,
-          cf_discord_x_username: discord_username,
-          cf_browser: browser,
-          cf_device: device,
-          cf_output_token_mint: output_token_mint,
-          cf_transaction_signature: transaction_signature,
-          cf_actual_result: actual_result,
-          cf_expected_result: expected_result,
-          cf_network: network
-        }
+        customFields: customFields
       },
       {
         headers: {
@@ -120,24 +135,30 @@ app.post("/api/create-ticket", async (req, res) => {
       }
     );
 
-    // 📎 BASE64 ATTACHMENT UPLOAD
+    // 📎 BASE64 ATTACHMENT
     if (file_data) {
-      const buffer = Buffer.from(file_data, "base64");
+      try {
+        const buffer = Buffer.from(file_data, "base64");
 
-      const formData = new FormData();
-      formData.append("file", buffer, file_name || "file.png");
+        const formData = new FormData();
+        formData.append("file", buffer, file_name || "file.png");
 
-      await axios.post(
-        `https://desk.zoho.in/api/v1/tickets/${ticket.data.id}/attachments`,
-        formData,
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${token}`,
-            orgId: process.env.ZOHO_ORG_ID,
-            ...formData.getHeaders()
+        await axios.post(
+          `https://desk.zoho.in/api/v1/tickets/${ticket.data.id}/attachments`,
+          formData,
+          {
+            headers: {
+              Authorization: `Zoho-oauthtoken ${token}`,
+              orgId: process.env.ZOHO_ORG_ID,
+              ...formData.getHeaders()
+            }
           }
-        }
-      );
+        );
+
+        console.log("Attachment uploaded ✅");
+      } catch (err) {
+        console.log("Attachment Error:", err.response?.data || err.message);
+      }
     }
 
     // ✅ RESPONSE
@@ -151,12 +172,12 @@ app.post("/api/create-ticket", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      error: err.response?.data || "Failed"
+      error: err.response?.data || "Failed to create ticket"
     });
   }
 });
 
-// 🔍 GET TICKET API
+// 🔍 GET TICKET
 app.get("/api/get-ticket/:id", async (req, res) => {
   try {
     const ticketId = req.params.id;
