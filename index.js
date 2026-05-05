@@ -5,9 +5,14 @@ const axios = require("axios");
 require("dotenv").config();
 const cors = require("cors");
 const FormData = require("form-data");
+const multer = require("multer");
+const fs = require("fs");
+
+// 📂 multer setup
+const upload = multer({ dest: "uploads/" });
 
 const app = express();
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 app.use(cors());
 
 // ✅ Health check
@@ -27,8 +32,8 @@ async function retry(fn, retries = 3) {
   }
 }
 
-// 🎫 CREATE TICKET
-app.post("/api/create-ticket", async (req, res) => {
+// 🎫 CREATE TICKET (multer enabled)
+app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
   try {
     const {
       subject,
@@ -48,10 +53,7 @@ app.post("/api/create-ticket", async (req, res) => {
       transaction_signature,
       actual_result,
       expected_result,
-      network,
-
-      file_name,
-      file_data
+      network
     } = req.body;
 
     console.log("REQ BODY:", req.body);
@@ -93,7 +95,7 @@ app.post("/api/create-ticket", async (req, res) => {
       }
     );
 
-    // 🧠 CUSTOM FIELDS CLEAN
+    // 🧠 CUSTOM FIELDS
     const cf = {
       cf_wallet_address: wallet_address,
       cf_wallet_provider: wallet_provider,
@@ -116,7 +118,7 @@ app.post("/api/create-ticket", async (req, res) => {
 
     console.log("FINAL CF:", cf);
 
-    // 🎫 CREATE TICKET (🔥 FINAL FIX)
+    // 🎫 CREATE TICKET
     const ticket = await axios.post(
       "https://desk.zoho.in/api/v1/tickets",
       {
@@ -124,12 +126,9 @@ app.post("/api/create-ticket", async (req, res) => {
         description,
         departmentId: process.env.ZOHO_DEPARTMENT_ID,
         contactId: contact.data.id,
-
         priority: "High",
         status: "Open",
         channel: "Web",
-
-        // 🔥 CORRECT KEY
         cf: cf
       },
       {
@@ -140,13 +139,11 @@ app.post("/api/create-ticket", async (req, res) => {
       }
     );
 
-    // 📎 ATTACHMENT
-    if (file_data) {
+    // 📎 FILE ATTACHMENT (multer)
+    if (req.file) {
       try {
-        const buffer = Buffer.from(file_data, "base64");
-
         const formData = new FormData();
-        formData.append("file", buffer, file_name || "file.png");
+        formData.append("file", fs.createReadStream(req.file.path));
 
         await axios.post(
           `https://desk.zoho.in/api/v1/tickets/${ticket.data.id}/attachments`,
@@ -161,6 +158,10 @@ app.post("/api/create-ticket", async (req, res) => {
         );
 
         console.log("Attachment uploaded ✅");
+
+        // 🧹 temp file delete
+        fs.unlinkSync(req.file.path);
+
       } catch (err) {
         console.log("Attachment Error:", err.response?.data || err.message);
       }
