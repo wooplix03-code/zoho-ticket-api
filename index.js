@@ -32,7 +32,7 @@ async function retry(fn, retries = 3) {
   }
 }
 
-// 🎫 CREATE TICKET (multer enabled)
+// 🎫 CREATE TICKET
 app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
   try {
     const {
@@ -58,7 +58,6 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
 
     console.log("REQ BODY:", req.body);
 
-    // ✅ validation
     if (!subject || !description || !email) {
       return res.status(400).json({
         success: false,
@@ -80,7 +79,7 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
 
     const token = tokenRes.data.access_token;
 
-    // 👤 CONTACT CREATE
+    // 👤 CONTACT
     const contact = await axios.post(
       "https://desk.zoho.in/api/v1/contacts",
       {
@@ -112,6 +111,7 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
       cf_network: network
     };
 
+    // remove empty fields
     Object.keys(cf).forEach((key) => {
       if (!cf[key]) delete cf[key];
     });
@@ -139,11 +139,15 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
       }
     );
 
-    // 📎 FILE ATTACHMENT (multer)
+    // 📎 FILE ATTACHMENT (FIXED VERSION)
     if (req.file) {
       try {
         const formData = new FormData();
-        formData.append("file", fs.createReadStream(req.file.path));
+
+        formData.append("file", fs.createReadStream(req.file.path), {
+          filename: req.file.originalname,      // ✅ FIX 1
+          contentType: req.file.mimetype        // ✅ FIX 2 (corruption fix)
+        });
 
         await axios.post(
           `https://desk.zoho.in/api/v1/tickets/${ticket.data.id}/attachments`,
@@ -159,7 +163,7 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
 
         console.log("Attachment uploaded ✅");
 
-        // 🧹 temp file delete
+        // delete temp file
         fs.unlinkSync(req.file.path);
 
       } catch (err) {
@@ -167,7 +171,6 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
       }
     }
 
-    // ✅ RESPONSE
     res.json({
       success: true,
       ticketId: ticket.data.id
@@ -225,7 +228,7 @@ app.get("/api/get-ticket/:id", async (req, res) => {
   }
 });
 
-// 🚀 START SERVER
+// 🚀 START
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
 });
