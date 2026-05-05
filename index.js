@@ -90,8 +90,8 @@ app.post("/api/create-ticket", async (req, res) => {
       }
     );
 
-    // 🧠 CLEAN CUSTOM FIELDS
-    const customFields = {
+    // 🧠 CUSTOM FIELDS CLEAN
+    const cf = {
       cf_wallet_address: wallet_address,
       cf_wallet_provider: wallet_provider,
       cf_discord_x_username: discord_username,
@@ -104,13 +104,13 @@ app.post("/api/create-ticket", async (req, res) => {
       cf_network: network
     };
 
-    Object.keys(customFields).forEach((key) => {
-      if (!customFields[key]) delete customFields[key];
+    Object.keys(cf).forEach((key) => {
+      if (!cf[key]) delete cf[key];
     });
 
-    console.log("FINAL CUSTOM FIELDS:", customFields);
+    console.log("FINAL CF:", cf);
 
-    // 🎫 CREATE TICKET (🔥 layoutId FIX)
+    // 🎫 CREATE TICKET (🔥 FINAL FIX)
     const ticket = await axios.post(
       "https://desk.zoho.in/api/v1/tickets",
       {
@@ -119,14 +119,12 @@ app.post("/api/create-ticket", async (req, res) => {
         departmentId: process.env.ZOHO_DEPARTMENT_ID,
         contactId: contact.data.id,
 
-        // 🔥 CRITICAL FIX
-        layoutId: process.env.ZOHO_LAYOUT_ID,
-
         priority: "High",
         status: "Open",
         channel: "Web",
 
-        customFields: customFields
+        // 🔥 CORRECT KEY
+        cf: cf
       },
       {
         headers: {
