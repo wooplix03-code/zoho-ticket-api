@@ -40,6 +40,8 @@ app.post("/api/create-ticket", async (req, res) => {
       wallet_provider,
       discord_username,
       browser,
+      request_type,
+      issue_category,
       device,
       input_token_mint,
       output_token_mint,
@@ -103,6 +105,8 @@ app.post("/api/create-ticket", async (req, res) => {
       cf_transaction_signature: transaction_signature,
       cf_actual_result: actual_result,
       cf_expected_result: expected_result,
+      cf_request_type: request_type,
+      cf_issue_category: issue_category,
       cf_network: network
     };
 
