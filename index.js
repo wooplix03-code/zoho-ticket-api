@@ -64,25 +64,38 @@ app.post("/api/create-ticket", async (req, res) => {
     );
 
     // create ticket
-    const ticket = await axios.post(
-      "https://desk.zoho.in/api/v1/tickets",
-      {
-        subject,
-        description,
-        departmentId: process.env.ZOHO_DEPARTMENT_ID,
-        contactId: contact.data.id,
-        priority: "High",
-        status: "Open",
-        channel: "Web"
-      },
-      {
-        headers: {
-          Authorization: `Zoho-oauthtoken ${token}`,
-          orgId: process.env.ZOHO_ORG_ID
-        }
-      }
-    );
+   const ticket = await axios.post(
+  "https://desk.zoho.in/api/v1/tickets",
+  {
+    subject,
+    description,
+    departmentId: process.env.ZOHO_DEPARTMENT_ID,
+    contactId: contact.data.id,
+    priority: "High",
+    status: "Open",
+    channel: "Web",
 
+    // 👇 CUSTOM FIELDS ADD HERE
+    customFields: {
+      cf_wallet_address: req.body.wallet_address,
+      cf_wallet_provider: req.body.wallet_provider,
+      cf_discord_x_username: req.body.discord_username,
+      cf_browser: req.body.browser,
+      cf_device: req.body.device,
+      cf_output_token_mint: req.body.output_token_mint,
+      cf_transaction_signature: req.body.transaction_signature,
+      cf_actual_result: req.body.actual_result,
+      cf_expected_result: req.body.expected_result,
+      cf_network: req.body.network
+    }
+  },
+  {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+      orgId: process.env.ZOHO_ORG_ID
+    }
+  }
+);
     res.json({
       success: true,
       ticketId: ticket.data.id
