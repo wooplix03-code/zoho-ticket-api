@@ -51,10 +51,9 @@ app.post("/api/create-ticket", async (req, res) => {
       file_data
     } = req.body;
 
-    // ✅ DEBUG LOG
     console.log("REQ BODY:", req.body);
 
-    // ✅ Validation
+    // ✅ validation
     if (!subject || !description || !email) {
       return res.status(400).json({
         success: false,
@@ -105,16 +104,13 @@ app.post("/api/create-ticket", async (req, res) => {
       cf_network: network
     };
 
-    // ❗ remove empty fields
     Object.keys(customFields).forEach((key) => {
-      if (customFields[key] === undefined || customFields[key] === null || customFields[key] === "") {
-        delete customFields[key];
-      }
+      if (!customFields[key]) delete customFields[key];
     });
 
     console.log("FINAL CUSTOM FIELDS:", customFields);
 
-    // 🎫 CREATE TICKET
+    // 🎫 CREATE TICKET (🔥 layoutId FIX)
     const ticket = await axios.post(
       "https://desk.zoho.in/api/v1/tickets",
       {
@@ -122,9 +118,14 @@ app.post("/api/create-ticket", async (req, res) => {
         description,
         departmentId: process.env.ZOHO_DEPARTMENT_ID,
         contactId: contact.data.id,
+
+        // 🔥 CRITICAL FIX
+        layoutId: process.env.ZOHO_LAYOUT_ID,
+
         priority: "High",
         status: "Open",
         channel: "Web",
+
         customFields: customFields
       },
       {
@@ -135,7 +136,7 @@ app.post("/api/create-ticket", async (req, res) => {
       }
     );
 
-    // 📎 BASE64 ATTACHMENT
+    // 📎 ATTACHMENT
     if (file_data) {
       try {
         const buffer = Buffer.from(file_data, "base64");
