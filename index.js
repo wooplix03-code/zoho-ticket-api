@@ -48,6 +48,7 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
       request_type,
       issue_category,
       device,
+      operating_system,
       input_token_mint,
       output_token_mint,
       transaction_signature,
@@ -106,6 +107,7 @@ app.post("/api/create-ticket", upload.single("file"), async (req, res) => {
       cf_transaction_signature: transaction_signature,
       cf_actual_result: actual_result,
       cf_expected_result: expected_result,
+      cf_operating_system: operating_system,
       cf_request_type: request_type,
       cf_issue_category: issue_category,
       cf_network: network
