@@ -357,6 +357,70 @@ app.patch("/api/update-ticket/:id", upload.single("file"), async (req, res) => {
   }
 });
 
+// 📜 GET TICKET HISTORY
+app.get("/api/ticket-history/:id", async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    const {
+      from = 0,
+      limit = 20,
+      eventFilter,
+      agentId,
+      fieldName
+    } = req.query;
+
+    // 🔐 TOKEN
+    const tokenRes = await retry(() =>
+      axios.post("https://accounts.zoho.in/oauth/v2/token", null, {
+        params: {
+          refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+          client_id: process.env.ZOHO_CLIENT_ID,
+          client_secret: process.env.ZOHO_CLIENT_SECRET,
+          grant_type: "refresh_token"
+        }
+      })
+    );
+
+    const token = tokenRes.data.access_token;
+
+    // 🧠 QUERY PARAMS
+    const params = {
+      from,
+      limit
+    };
+
+    if (eventFilter) params.eventFilter = eventFilter;
+    if (agentId) params.agentId = agentId;
+    if (fieldName) params.fieldName = fieldName;
+
+    // 📜 HISTORY API
+    const response = await axios.get(
+      `https://desk.zoho.in/api/v1/tickets/${ticketId}/History`,
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${token}`,
+          orgId: process.env.ZOHO_ORG_ID
+        },
+        params
+      }
+    );
+
+    res.json({
+      success: true,
+      data: response.data
+    });
+
+  } catch (err) {
+    console.log("HISTORY ERROR:", err.response?.data || err.message);
+
+    res.status(500).json({
+      success: false,
+      error: err.response?.data || "Failed to fetch ticket history"
+    });
+  }
+});
+
 // 🚀 START
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
